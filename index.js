@@ -24,12 +24,13 @@ client.once('ready', () => {
 
 
 async function set_value(namespace, key, value) {
-	const ret = await db.query( 'INSERT INTO keyvaluestore (namespace, `key`, value) VALUES (?,?,?) ON DUPLICATE KEY UPDATE value=?', [namespace, key, value, value] );
-	if(ret.affectedRows == 1)
-		return 'Succesfully inserted value for '+key;
-	if(ret.affectedRows == 2)
-		return 'Succesfully updated value for '+key;
-	return 'Failed to insert/update '+key;
+	try {
+		const ret = await db.query( 'INSERT INTO keyvaluestore (namespace, `key`, value) VALUES (?,?,?) ON DUPLICATE KEY UPDATE value=?', [namespace, key, value, value] );
+		return true;
+	} catch(e) {
+		console.error(e);
+	}
+	return false;
 }
 
 const sharpTransformer = sharp()
@@ -72,8 +73,14 @@ async function save_picture(namespace, key, picture_url) {
 }
 
 async function set_picture(namespace, key, picture_url) {
-	const local_url = await save_picture(namespace, key, picture_url);
-	return await db.query( 'INSERT INTO keyvaluestore (namespace, `key`, picture_url) VALUES (?,?,?) ON DUPLICATE KEY UPDATE picture_url=?', [namespace, key, local_url, local_url] );
+	try {
+		const local_url = await save_picture(namespace, key, picture_url);
+		await db.query( 'INSERT INTO keyvaluestore (namespace, `key`, picture_url) VALUES (?,?,?) ON DUPLICATE KEY UPDATE picture_url=?', [namespace, key, local_url, local_url] );
+	} catch(e) {
+		console.error(e);
+		return false;
+	}
+	return true;
 }
 
 async function get_value(namespace, key) {
@@ -108,11 +115,11 @@ client.on('interactionCreate', async interaction => {
 			await interaction.reply({ embeds: [embed], files: files, ephemeral: true });
 		} else if (commandName === 'setinfo') {
 			const res = await set_value(interaction.guildId, interaction.options.getString('key'), interaction.options.getString('value'))
-			await interaction.reply(JSON.stringify(res));
+			await interaction.reply({content: res?'OK!':'Failed', ephemeral: true});
 		} else if (commandName === 'setpicture') {
 			const attachment = interaction.options.getAttachment('attachment');
 			const res = set_picture(interaction.guildId, interaction.options.getString('key'), attachment.url);
-			await interaction.reply('Set picture: '+JSON.stringify(res));
+			await interaction.reply({content: res?'OK!':'Failed', ephemeral: true});
 		}
 	}	
 	catch(e) {
