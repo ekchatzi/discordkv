@@ -1,0 +1,1 @@
+CREATE TABLE `discordkv_db`.`keyvaluestore` ( `key` VARCHAR(128) NOT NULL , `namespace` VARCHAR(128) NOT NULL , `value` TEXT NOT NULL , PRIMARY KEY (`key`, `namespace`)) ENGINE = InnoDB;
