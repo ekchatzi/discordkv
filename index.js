@@ -89,11 +89,30 @@ async function get_value(namespace, key) {
 	return rows[0];
 }
 
+async function get_namespace_allowed_roles(namespace) {
+	const [rows, fields] = await db.query( 'SELECT namespace, role FROM allowed_roles WHERE namespace=?', [namespace] );
+	if(rows.length == 0) return null;
+	let ret = [];
+	for(let i=0; i < rows.length; ++i) 
+		ret.push(rows[i].role.toLowerCase());
+	return ret;
+}
+
 client.on('interactionCreate', async interaction => {
 	if (!interaction.isChatInputCommand()) return;
 	console.log(interaction);
 
 	try {
+		let allowed_roles = await get_namespace_allowed_roles(interaction.guildId);
+		console.log('Allowed roles: ', allowed_roles);
+		console.log(interaction.member.roles.cache);
+		
+		if(allowed_roles && !interaction.member.roles.cache.some(r=>allowed_roles.includes(r.name.toLowerCase()))) {
+			console.log('Access denied');
+			interaction.reply({content: 'You are not allowed to use this command', ephemeral: true});
+			return;
+		}
+
 		const { commandName } = interaction;
 		if (commandName === 'info') {
 			const key = interaction.options.getString('key');
@@ -112,19 +131,19 @@ client.on('interactionCreate', async interaction => {
 			} 
 	
 			console.log(embed);
-			await interaction.reply({ embeds: [embed], files: files, ephemeral: true });
+			interaction.reply({ embeds: [embed], files: files, ephemeral: true });
 		} else if (commandName === 'setinfo') {
 			const res = await set_value(interaction.guildId, interaction.options.getString('key'), interaction.options.getString('value'))
-			await interaction.reply({content: res?'OK!':'Failed', ephemeral: true});
+			interaction.reply({content: res?'OK!':'Failed', ephemeral: true});
 		} else if (commandName === 'setpicture') {
 			const attachment = interaction.options.getAttachment('attachment');
 			const res = set_picture(interaction.guildId, interaction.options.getString('key'), attachment.url);
-			await interaction.reply({content: res?'OK!':'Failed', ephemeral: true});
+			interaction.reply({content: res?'OK!':'Failed', ephemeral: true});
 		}
 	}	
 	catch(e) {
 		console.error(e);
-		await interaction.reply('Something went wrong: '+e);
+		interaction.reply({content:'Something went wrong: '+e, ephemeral:true});
 	}
 });
 
